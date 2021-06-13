@@ -1,11 +1,14 @@
 #include "HttpServer.h"
 
+
+
+#include <chrono>
+
 void HttpServer::listen(uint16_t port)
 {
 	try
 	{
-		m_socket.start(port);
-		m_socket.listen();
+		m_socket.listen(port);
 	}
 	catch (std::runtime_error error)
 	{
@@ -13,73 +16,64 @@ void HttpServer::listen(uint16_t port)
 		std::exit(-1);
 	}
 
-	while (true)
+	try
 	{
-		TcpSocket client = m_socket.accept();
-
-		if (client.isValid())
+		while (true)
 		{
-			std::thread clientThread([this, client] { this->handleClient(client); });
-			clientThread.detach();
+			TcpSocket client = m_socket.accept();
+
+			if (client.isValid())
+			{
+				std::thread clientThread([this, &client] { this->handleClient(client); });
+				clientThread.detach();
+			}
 		}
+	}
+	catch (std::runtime_error error)
+	{
+		std::cout << error.what();
 	}
 
 	m_socket.close();
 }
 
-void HttpServer::handleClient(TcpSocket client)
+void HttpServer::handleClient(TcpSocket& client)
 {
-	static constexpr int dataBufferSize = 8192;
-	char dataBuffer[dataBufferSize];
+	static constexpr int messageBufferSize = 4096;
+	char messageBuffer[messageBufferSize];
 
-	HttpRequestParser parser(dataBuffer, dataBufferSize);
+	HttpRequestParser parser(messageBuffer);
 
 	while (true)
 	{
 		int messageSize;
-		client.receive(dataBuffer, dataBufferSize, &messageSize);
+		client.receive(messageBuffer, messageBufferSize, &messageSize);
 
-		if (messageSize == 0 || messageSize == -1)
-		{
-			break;
-		}
-		else
+		if (messageSize > 0)
 		{
 			try
 			{
-				parser.setBufferSize(dataBufferSize);
-				parser.parse();
+				// Parsing can be split between multiple receive calls
+				parser.parse(messageSize);
 			}
 			catch (HttpRequestParser::Interrupt interrupt)
 			{
-				std::cout << "interrupt " << int(interrupt) << '\n';
-
-				if (interrupt == HttpRequestParser::Interrupt::reachedBufferEnd)
-				{
-				}
-				else if (interrupt == HttpRequestParser::Interrupt::finishedParsingFullRequest)
-				{
+				if (interrupt == HttpRequestParser::Interrupt::finishedParsingFullRequest)
 					handleRequest(client, parser.result());
-
-					break;
-				}
-				else
-				{
-					break;
-				}
+				// Continute parsing on reachedBufferEnd
+				else if (interrupt != HttpRequestParser::Interrupt::reachedBufferEnd)
+					handleInvalidRequest(client, parser.result(), interrupt);
 			}
-
-
-			// recheck if every bytesParsed is added and removed correclty
-
-
-			// should it be able to be reset? it would introducing more ifs because of the need to save state	
+		}
+		else
+		{
+			// End connection on empty message or error
+			return;
 		}
 	}
-	client.close();
 }
 
-void HttpServer::handleRequest(TcpSocket client, const HttpRequest& request)
+void HttpServer::handleRequest(TcpSocket& client, const HttpRequest& request)
 {
 	std::cout << static_cast<int>(request.method) << '\n';
 	std::cout << request.requestTarget << '\n';
@@ -91,6 +85,36 @@ void HttpServer::handleRequest(TcpSocket client, const HttpRequest& request)
 	}
 
 	std::cout << request.body << '\n';
+
+	char message[] = "HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nTest message";
+	char buffer[sizeof(message)];
+	strcpy(buffer, message);
+	client.send(buffer, sizeof(buffer));
+}
+
+void HttpServer::handleInvalidRequest(TcpSocket& client, const HttpRequest& request, HttpRequestParser::Interrupt error)
+{
+	char message[] = "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nInvalid request";
+	char buffer[sizeof(message)];
+	strcpy(buffer, message);
+	client.send(buffer, sizeof(buffer));
+
+	// maybe use a unordered_map of Interrupt and function
+	switch (error)
+	{
+	case HttpRequestParser::Interrupt::unsupportedMethod:
+
+		break;
+	case HttpRequestParser::Interrupt::invalidChar:
+
+		break;
+	case HttpRequestParser::Interrupt::invalidHeaderValue:
+
+		break;
+	case HttpRequestParser::Interrupt::unsupportedVersion:
+
+		break;
+	}
 }
 
 void HttpServer::sendFile(int socket, const char* path, int fileSize)

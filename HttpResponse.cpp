@@ -1,6 +1,6 @@
-#include "HttpResponseHeader.h"
+#include "HttpResponse.h"
 
-std::string HttpResponseHeader::toString()
+std::string HttpResponse::toString()
 {
 	std::string response;
 	response.reserve(100);

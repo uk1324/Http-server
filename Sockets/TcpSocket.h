@@ -4,15 +4,18 @@
 #include <stdexcept>
 #include <string>
 
-#include "socketIncludes.h"
+#include "Socket.h"
 
 class TcpSocket
 {
 public:
 	TcpSocket() = default;
+	~TcpSocket();
 
-	void start(uint16_t port);
-	void listen();
+	TcpSocket(const TcpSocket&) = delete;
+	TcpSocket& operator=(TcpSocket const&) = delete;
+
+	void listen(uint16_t port);
 	TcpSocket accept();
 
 	void send(char* buffer, int messageLength);
@@ -23,9 +26,11 @@ public:
 	bool isValid();
 
 private:
-	TcpSocket(int socketHandle);
+	void setupServer(uint16_t port);
+
+	TcpSocket(int socketDescriptor);
 
 private:
-	int m_handle;
+	int m_socketDescriptor = Socket::invalidSocketDescriptor;
 };
 

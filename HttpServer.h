@@ -7,10 +7,8 @@
 #include <fstream>
 #include <filesystem>
 
-#include "HttpRequestHeader.h"
-#include "HttpResponseHeader.h"
-#include "HttpRequestParser.h"
-#include "./Sockets/TcpSocket.h"
+#include "Parsing/HttpRequestParser.h"
+#include "Sockets/TcpSocket.h"
 
 class HttpServer
 {
@@ -18,8 +16,9 @@ public:
 	HttpServer() = default;
 
 	void listen(uint16_t port);
-	void handleClient(TcpSocket client);
-	void handleRequest(TcpSocket client, const HttpRequest& request);
+	void handleClient(TcpSocket& client);
+	void handleRequest(TcpSocket& client, const HttpRequest& request);
+	void handleInvalidRequest(TcpSocket& client, const HttpRequest& request, HttpRequestParser::Interrupt error);
 	void sendFile(int socket, const char* path, int fileSize);
 
 private:	

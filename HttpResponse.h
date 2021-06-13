@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-class HttpResponseHeader
+class HttpResponse
 {
 public:
 	int m_statusCode = 200;

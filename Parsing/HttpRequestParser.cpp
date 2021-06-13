@@ -1,15 +1,22 @@
 #include "HttpRequestParser.h"
 
+
+
+
 #include <iostream>
 
-HttpRequestParser::HttpRequestParser(const char* buffer, int dataSize)
+
+HttpRequestParser::HttpRequestParser(const char* buffer)
 	: m_bufferStart(buffer)
-	, m_bufferEnd(buffer + dataSize - 1)
 	, m_currentChar(buffer)
+	, m_bufferEnd(nullptr)
 {}
 
-void HttpRequestParser::parse()
+void HttpRequestParser::parse(int messageSize)
 {
+	m_bufferEnd = m_bufferStart + messageSize;
+	m_currentChar = m_bufferStart;
+
 	try
 	{
 		while (true)
@@ -20,6 +27,8 @@ void HttpRequestParser::parse()
 				m_currentState = State::parsingRequestLine;
 				parseRequestLine();
 
+				checkIfRequestTooBig();
+
 				[[fallthrough]];
 
 			case State::parsingHeadersEndCrlf:
@@ -27,7 +36,9 @@ void HttpRequestParser::parse()
 				try
 				{
 					parseCrlf();
-					
+
+					checkIfRequestTooBig();
+
 					m_currentState = State::parsingBody;
 					break;
 				}
@@ -35,8 +46,8 @@ void HttpRequestParser::parse()
 				{
 					if (interrupt == Interrupt::invalidChar)
 					{
-						m_currentChar -= parsedCrlf.length();
-						parsedCrlf.clear();
+						m_currentChar -= parsedCrlfState.length();
+						parsedCrlfState.clear();
 					}
 					else
 					{
@@ -49,11 +60,15 @@ void HttpRequestParser::parse()
 				m_currentState = State::parsingHeaderName;
 				parseHeaderName();
 
+				checkIfRequestTooBig();
+
 				[[fallthrough]];
 
 			case State::parsingHeaderValue:
 				m_currentState = State::parsingHeaderValue;
 				parseHeaderValue();
+
+				checkIfRequestTooBig();
 
 				[[fallthrough]];
 
@@ -61,10 +76,12 @@ void HttpRequestParser::parse()
 				m_currentState = State::parsingHeaderCrlf;
 				parseCrlf();
 
-				m_parsedRequest.headers[headerName] = headerValue;
-				headerName.clear();
-				headerValue.clear();
-				parsedCrlf.clear();
+				checkIfRequestTooBig();
+
+				m_parsedRequest.headers[headerNameState] = headerValueState;
+				headerNameState.clear();
+				headerValueState.clear();
+				parsedCrlfState.clear();
 
 				m_currentState = State::parsingHeadersEndCrlf;
 				break;
@@ -87,13 +104,11 @@ void HttpRequestParser::parse()
 	}
 	catch (Interrupt interrupt)
 	{
+		if ((interrupt != Interrupt::reachedBufferEnd) && (interrupt != Interrupt::finishedParsingFullRequest))
+			resetState();
+
 		throw interrupt;
 	}
-
-
-	//std::cout << int(m_bufferEnd) << '\n';
-	//std::cout << int(m_bufferStart) << '\n';
-	//std::cout << int(m_currentChar) << '\n';
 }
 
 void HttpRequestParser::parseRequestLine()
@@ -104,11 +119,9 @@ void HttpRequestParser::parseRequestLine()
 	try
 	{
 		parseMethod();
-
 		parseRequestTarget();
-
 		parseVersion();
-		
+
 		if (matchString("\r\n") == false)
 			throw Interrupt::invalidChar;
 	}
@@ -131,7 +144,6 @@ void HttpRequestParser::parseMethod()
 		hashString("CONNECT"),
 		hashString("PATCH")
 	};
-
 	static constexpr int longestMethodName = 7;
 
 	int hash = 0;
@@ -142,11 +154,11 @@ void HttpRequestParser::parseMethod()
 		if (*m_currentChar == ' ')
 		{
 			// Skip space
-			moveCurrentCharForward(); 
+			moveCurrentCharForward();
 
 			break;
 		}
-		
+
 		// Buffer ended but haven't finished parsing
 		if (m_currentChar == m_bufferEnd)
 		{
@@ -177,6 +189,10 @@ void HttpRequestParser::parseMethod()
 
 void HttpRequestParser::parseRequestTarget()
 {
+	// Only allow relative URLs
+	if (*m_currentChar != '/')
+		throw Interrupt::invalidChar;
+
 	while (true)
 	{
 		if (*m_currentChar == ' ')
@@ -193,7 +209,7 @@ void HttpRequestParser::parseRequestTarget()
 				throw Interrupt::invalidChar;
 			}
 		}
-		
+
 		// Buffer ended but haven't finished parsing or invalid char
 		if ((isValidPathChar(*m_currentChar) == false) || (m_currentChar == m_bufferEnd))
 		{
@@ -219,7 +235,7 @@ void HttpRequestParser::parseVersion()
 		if (matchString("HTTP/") == false)
 			throw Interrupt::invalidChar;
 	}
-	catch(Interrupt interrupt)
+	catch (Interrupt interrupt)
 	{
 		throw interrupt;
 	}
@@ -239,7 +255,7 @@ void HttpRequestParser::parseVersion()
 		else if (m_currentChar == m_bufferEnd)
 			throw Interrupt::unsupportedVersion;
 
-		hash = hash * hashMultiplier + *m_currentChar;
+		hash = hashChar(hash, *m_currentChar);
 		hashedCharsCount++;
 
 		moveCurrentCharForward();
@@ -265,8 +281,9 @@ void HttpRequestParser::parseHeaderName()
 	{
 		if (*m_currentChar == ':')
 		{
-			m_currentChar++; // Skip colon
-			m_bytesParsed++;
+			// Skip colon
+			moveCurrentCharForward();
+
 			break;
 		}
 		else if (isValidHeaderChar(*m_currentChar) == false)
@@ -274,9 +291,8 @@ void HttpRequestParser::parseHeaderName()
 			throw Interrupt::invalidChar;
 		}
 
-		headerName += *m_currentChar;
-		m_currentChar++;
-		m_bytesParsed++;
+		headerNameState += *m_currentChar;
+		moveCurrentCharForward();
 
 		if (m_currentChar == m_bufferEnd)
 		{
@@ -294,15 +310,14 @@ void HttpRequestParser::parseHeaderValue()
 			break;
 		}
 		else if (((isValidHeaderChar(*m_currentChar) == false)
-			   && (isWhitespace(*m_currentChar) == false)
-			   && (isValidSeparatorChar(*m_currentChar) == false)))
+			&& (isWhitespace(*m_currentChar) == false)
+			&& (isValidSeparatorChar(*m_currentChar) == false)))
 		{
-			throw ParserInterrupt();
+			throw Interrupt::invalidChar;
 		}
 
-		headerValue += *m_currentChar;
-		m_currentChar++;
-		m_bytesParsed++;
+		headerValueState += *m_currentChar;
+		moveCurrentCharForward();
 
 		if (m_currentChar == m_bufferEnd)
 		{
@@ -313,22 +328,21 @@ void HttpRequestParser::parseHeaderValue()
 
 void HttpRequestParser::parseCrlf()
 {
-	std::string crlf = "\r\n";
+	static const std::string crlf = "\r\n";
 
 	while (true)
 	{
-		if (*m_currentChar != crlf[parsedCrlf.length()])
+		if (*m_currentChar != crlf[parsedCrlfState.length()])
 		{
 			throw Interrupt::invalidChar;
 		}
 
-		m_currentChar++;
-		m_bytesParsed++;
-		parsedCrlf += *m_currentChar;
+		moveCurrentCharForward();
+		parsedCrlfState += *m_currentChar;
 
-		if (parsedCrlf.length() == crlf.length())
+		if (parsedCrlfState.length() == crlf.length())
 		{
-			parsedCrlf.clear();
+			parsedCrlfState.clear();
 			break;
 		}
 
@@ -339,43 +353,18 @@ void HttpRequestParser::parseCrlf()
 	}
 }
 
-void HttpRequestParser::parseHeaders()
-{
-
-
-
-
-	// Specification: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
-
-	//static const std::string crlf = "\r\n";
-
-	/*while (matchString(crlf) == false)
-	{
-		m_currentChar -= crlf.length();
-		m_bytesParsed -= crlf.length();
-
-		try {
-			parseHeaderLine();
-		}
-		catch (ParserInterrupt& error)
-		{
-			throw error;
-		}
-	}*/
-}
-void HttpRequestParser::parseHeaderLine()
-{
-
-}
-
 void HttpRequestParser::parseBody()
-{	
+{
 	if (m_parsedRequest.headers.count("Content-Length") > 0)
 	{
 		int contentLength;
 		try
 		{
 			contentLength = std::stoi(m_parsedRequest.headers["Content-Length"]);
+
+			// Don't know if this is safe
+			if (contentLength <= maxRequestBodyLength)
+				m_parsedRequest.body.reserve(contentLength);
 		}
 		catch (std::exception error)
 		{
@@ -386,9 +375,8 @@ void HttpRequestParser::parseBody()
 		{
 			m_parsedRequest.body += *m_currentChar;
 			moveCurrentCharForward();
-			bodyBytesParsed++;
 
-			if (bodyBytesParsed == contentLength)
+			if (m_parsedRequest.body.length() == contentLength)
 			{
 				throw Interrupt::finishedParsingFullRequest;
 			}
@@ -405,52 +393,22 @@ void HttpRequestParser::parseBody()
 	}
 }
 
-//std::string HttpRequestParser::parseUntil(char charToMatch)
-//{
-//	std::string result;
-//	result.reserve(reservedStringSize);
-//
-//	while (true)
-//	{
-//		if (*m_currentChar == charToMatch)
-//			break;
-//		else if (m_currentChar == m_bufferEnd)
-//			throw ParserInterrupt();
-//
-//		result += *m_currentChar;
-//
-//		m_currentChar++;
-//		m_bytesParsed++;
-//	}
-//
-//	return result;
-//}
-
 void HttpRequestParser::skipChars(char charToMatch)
 {
 	while ((*m_currentChar == charToMatch) && (m_currentChar < m_bufferEnd))
-	{
-		m_currentChar++;
-		m_bytesParsed++;
-	}
+		moveCurrentCharForward();
 }
 
 void HttpRequestParser::skipWhitespaces()
 {
 	while ((isWhitespace(*m_currentChar)) && (m_currentChar < m_bufferEnd))
-	{
-		m_currentChar++;
-		m_bytesParsed++;
-	}
+		moveCurrentCharForward();
 }
 
 void HttpRequestParser::skipUntil(char charToMatch)
 {
 	while ((*m_currentChar != charToMatch) && (m_currentChar < m_bufferEnd))
-	{
-		m_currentChar++;
-		m_bytesParsed++;
-	}
+		moveCurrentCharForward();
 }
 
 bool HttpRequestParser::matchString(std::string target)
@@ -465,7 +423,7 @@ bool HttpRequestParser::matchString(std::string target)
 			m_currentChar += target.length();
 			m_bytesParsed += target.length();
 			return false;
-		}			
+		}
 	}
 
 	m_currentChar += target.length();
@@ -476,9 +434,6 @@ bool HttpRequestParser::matchString(std::string target)
 bool HttpRequestParser::isValidPathChar(char chr)
 {
 	// https://datatracker.ietf.org/doc/html/rfc3986#section-2
-	// only gets optimzed to switch in gcc
-	// don't know what to do with chars like '\' not specified anywhere in the standard but it isn't considered illegal by most parsers
-	// node.js parsers allows it https://github.com/nodejs/llhttp/blob/master/test/request/uri.md
 	return isalnum(chr)
 		|| chr == '-'
 		|| chr == '.'
@@ -564,25 +519,11 @@ int HttpRequestParser::hexDigitToInt(char digit)
 	return num;
 }
 
-void HttpRequestParser::moveCurrentCharForward()
+void HttpRequestParser::checkIfRequestTooBig()
 {
-	m_currentChar++;
-	m_bytesParsed++;
+	if (m_bytesParsed > maxRequestLength)
+		throw Interrupt::requestTooBig;
 }
-
-//int HttpRequestParser::hashStringUntil(char endChar)
-//{
-//	static constexpr int multiplier = 37;
-//
-//	int hash = 0;
-//	while (m_buffer[m_currentIndex] != endChar && m_currentIndex < m_bufferSize)
-//	{
-//		hash = hash * multiplier + m_buffer[m_currentIndex];
-//		m_currentIndex++;
-//	}
-//
-//	return hash;
-//}
 
 int HttpRequestParser::hashChar(int lastHash, char chr)
 {
