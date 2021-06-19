@@ -7,6 +7,7 @@ int Socket::create(int protocolFamily, int type, int protocol)
 	int socketDescriptor = socket(protocolFamily, type, protocol);
 	if (socketDescriptor == invalidSocketDescriptor)
 		throw std::runtime_error("Socket::create() error " + std::to_string(getErrorCode()) + '\n');
+	return socketDescriptor;
 }
 
 void Socket::close(int socketDescriptor)

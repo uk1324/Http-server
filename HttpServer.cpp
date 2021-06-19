@@ -1,9 +1,5 @@
 #include "HttpServer.h"
 
-
-
-#include <chrono>
-
 void HttpServer::listen(uint16_t port)
 {
 	try
@@ -58,6 +54,7 @@ void HttpServer::handleClient(TcpSocket& client)
 			}
 			catch (HttpRequestParser::Interrupt interrupt)
 			{
+				std::cout << "interrupt " << int(interrupt) << '\n';
 				if (interrupt == HttpRequestParser::Interrupt::finishedParsingFullRequest)
 					handleRequest(client, parser.result());
 				// Continute parsing on reachedBufferEnd
@@ -68,6 +65,9 @@ void HttpServer::handleClient(TcpSocket& client)
 		else
 		{
 			// End connection on empty message or error
+			std::cout << "err " << messageSize << " " << WSAGetLastError() << '\n';
+
+			client.close();
 			return;
 		}
 	}
@@ -90,6 +90,7 @@ void HttpServer::handleRequest(TcpSocket& client, const HttpRequest& request)
 	char buffer[sizeof(message)];
 	strcpy(buffer, message);
 	client.send(buffer, sizeof(buffer));
+
 }
 
 void HttpServer::handleInvalidRequest(TcpSocket& client, const HttpRequest& request, HttpRequestParser::Interrupt error)
@@ -98,23 +99,7 @@ void HttpServer::handleInvalidRequest(TcpSocket& client, const HttpRequest& requ
 	char buffer[sizeof(message)];
 	strcpy(buffer, message);
 	client.send(buffer, sizeof(buffer));
-
 	// maybe use a unordered_map of Interrupt and function
-	switch (error)
-	{
-	case HttpRequestParser::Interrupt::unsupportedMethod:
-
-		break;
-	case HttpRequestParser::Interrupt::invalidChar:
-
-		break;
-	case HttpRequestParser::Interrupt::invalidHeaderValue:
-
-		break;
-	case HttpRequestParser::Interrupt::unsupportedVersion:
-
-		break;
-	}
 }
 
 void HttpServer::sendFile(int socket, const char* path, int fileSize)

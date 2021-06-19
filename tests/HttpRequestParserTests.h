@@ -9,8 +9,8 @@ namespace Tests
 	{
 		static void methodParsingTest1()
 		{
-			bool test;
-			const char* buffer = "GET / HTTP/1.1\r\n";
+			bool finishedParsing = false, parsedProperly; 
+			char buffer[] = "GET / HTTP/1.1\r\n\r\n";
 
 			HttpRequestParser parser(buffer);
 			try
@@ -19,16 +19,40 @@ namespace Tests
 			}
 			catch (HttpRequestParser::Interrupt interrupt)
 			{
-				//if ()
+				finishedParsing = (interrupt == HttpRequestParser::Interrupt::finishedParsingFullRequest);
 			}
 
-			test = parser.result().method == HttpMethod::Get;
-			assertTrue(test, "Basic method parsing");
+			parsedProperly = parser.result().method == HttpMethod::Get;
+
+			assertTrue(finishedParsing && parsedProperly, "Basic method parsing");
 		}
 
+		static void methodParsingTest2()
+		{
+			bool finishedParsing = false, parsedProperly;
+			char buffer[] = "POST / HTTP/1.1\r\n\r\n";
+
+			HttpRequestParser parser(buffer);
+			try
+			{
+				parser.parse(sizeof(buffer) - 1);
+			}
+			catch (HttpRequestParser::Interrupt interrupt)
+			{
+				finishedParsing = (interrupt == HttpRequestParser::Interrupt::finishedParsingFullRequest);
+			}
+
+			parsedProperly = parser.result().method == HttpMethod::Post;
+
+			assertTrue(finishedParsing && parsedProperly, "Basic method parsing2");
+		}
+
+	public:
 		static void runAllTests()
 		{
+			// doesn't break when it method starts parsing when reachBufferEnd
 			methodParsingTest1();
+			methodParsingTest2();
 		}
 	};
 }

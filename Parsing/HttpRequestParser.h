@@ -57,10 +57,12 @@ private:
 	int hexDigitToInt(char digit);
 
 	inline void moveCurrentCharForward();
+	inline void moveCurrentCharForward(int count);
 
 	void resetState();
 
 	void checkIfRequestTooBig();
+	void checkIfReachBufferEnd();
 
 	static int hashChar(int lastHash, char chr);
 	static int hashString(const char* string);
@@ -80,7 +82,6 @@ private:
 	static constexpr int maxRequestBodyLength = 8192;
 
 	HttpRequest m_parsedRequest;
-
 
 	State m_currentState = State::parsingRequestLine;
 
@@ -107,11 +108,17 @@ inline void HttpRequestParser::moveCurrentCharForward()
 	m_bytesParsed++;
 }
 
+inline void HttpRequestParser::moveCurrentCharForward(int count)
+{
+	m_currentChar += count;
+	m_bytesParsed += count;
+}
+
 inline void HttpRequestParser::resetState()
 {
 	m_bytesParsed = 0;
 	m_parsedRequest = HttpRequest();
-	// This may be unsafe because std::string::clear() does not dealocate memory it just sets first char to null
+	// This may be unsafe because std::string::clear() does not dealocate memory it just sets the length to 0
 	headerNameState.clear();
 	headerValueState.clear();
 	parsedCrlfState.clear();

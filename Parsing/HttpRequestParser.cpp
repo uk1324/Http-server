@@ -1,11 +1,5 @@
 #include "HttpRequestParser.h"
 
-
-
-
-#include <iostream>
-
-
 HttpRequestParser::HttpRequestParser(const char* buffer)
 	: m_bufferStart(buffer)
 	, m_currentChar(buffer)
@@ -54,9 +48,11 @@ void HttpRequestParser::parse(int messageSize)
 						throw interrupt;
 					}
 				}
+
 				[[fallthrough]];
 
 			case State::parsingHeaderName:
+
 				m_currentState = State::parsingHeaderName;
 				parseHeaderName();
 
@@ -103,7 +99,7 @@ void HttpRequestParser::parse(int messageSize)
 		}
 	}
 	catch (Interrupt interrupt)
-	{
+	{	 
 		if ((interrupt != Interrupt::reachedBufferEnd) && (interrupt != Interrupt::finishedParsingFullRequest))
 			resetState();
 
@@ -133,17 +129,15 @@ void HttpRequestParser::parseRequestLine()
 
 void HttpRequestParser::parseMethod()
 {
-	static const int hashes[] = {
-		hashString("GET"),
-		hashString("HEAD"),
-		hashString("POST"),
-		hashString("PUT"),
-		hashString("DELETE"),
-		hashString("TRACE"),
-		hashString("OPTIONS"),
-		hashString("CONNECT"),
-		hashString("PATCH")
+	static const std::unordered_map<int, HttpMethod> hashes
+	{
+		{ hashString("GET"),    HttpMethod::Get },
+		{ hashString("POST"),   HttpMethod::Post },
+		{ hashString("PUT"),    HttpMethod::Put },
+		{ hashString("DELETE"), HttpMethod::Delete },
+		{ hashString("PATCH"),  HttpMethod::Patch }
 	};
+
 	static constexpr int longestMethodName = 7;
 
 	int hash = 0;
@@ -170,21 +164,13 @@ void HttpRequestParser::parseMethod()
 		moveCurrentCharForward();
 
 		if (hashedCharsCount > longestMethodName)
-		{
 			throw Interrupt::unsupportedMethod;
-		}
 	}
 
-	for (int i = 0; i < sizeof(hashes) / sizeof(hashes[0]); i++)
-	{
-		if (hash == hashes[i])
-		{
-			m_parsedRequest.method = static_cast<HttpMethod>(i);
-			return;
-		}
-	}
-
-	throw Interrupt::unsupportedMethod;
+	if (hashes.count(hash) > 0)
+		m_parsedRequest.method = hashes.at(hash);
+	else
+		throw Interrupt::unsupportedMethod;
 }
 
 void HttpRequestParser::parseRequestTarget()
@@ -223,9 +209,9 @@ void HttpRequestParser::parseRequestTarget()
 
 void HttpRequestParser::parseVersion()
 {
-	static const int hashes[] = {
-		hashString("1.0"),
-		hashString("1.1"),
+	static const std::unordered_map<int, HttpVersion> hashes = {
+		{ hashString("1.0"), HttpVersion::Http10 },
+		{ hashString("1.1"), HttpVersion::Http11 }
 	};
 
 	static constexpr int maxVersionStringLength = 3;
@@ -264,19 +250,15 @@ void HttpRequestParser::parseVersion()
 			throw Interrupt::unsupportedVersion;
 	}
 
-	for (int i = 0; i < sizeof(hashes) / sizeof(hashes[0]); i++)
-	{
-		if (hash == hashes[i])
-		{
-			m_parsedRequest.version = static_cast<HttpVersion>(i);
-			return;
-		}
-	}
-
-	throw Interrupt::unsupportedVersion;;
+	if (hashes.count(hash) > 0)
+		m_parsedRequest.version = hashes.at(hash);
+	else
+		throw Interrupt::unsupportedVersion;
 }
 void HttpRequestParser::parseHeaderName()
 {
+	checkIfReachBufferEnd();
+
 	while (true)
 	{
 		if (*m_currentChar == ':')
@@ -303,6 +285,8 @@ void HttpRequestParser::parseHeaderName()
 
 void HttpRequestParser::parseHeaderValue()
 {
+	checkIfReachBufferEnd();
+
 	while (true)
 	{
 		if (*m_currentChar == '\r')
@@ -329,6 +313,8 @@ void HttpRequestParser::parseHeaderValue()
 void HttpRequestParser::parseCrlf()
 {
 	static const std::string crlf = "\r\n";
+
+	checkIfReachBufferEnd();
 
 	while (true)
 	{
@@ -371,20 +357,25 @@ void HttpRequestParser::parseBody()
 			throw Interrupt::invalidHeaderValue;
 		}
 
-		while (true)
+		int unreadBytesInBuffer = m_bufferEnd - m_currentChar;
+		int bodyBytesRemeaining = contentLength - m_parsedRequest.body.length();
+
+		// This is unlikely to happen but the client might send more bytes than Content-length specifies
+		int bytesToRead = unreadBytesInBuffer > bodyBytesRemeaining
+			? bodyBytesRemeaining
+			: unreadBytesInBuffer;
+
+		m_parsedRequest.body.append(m_currentChar, bytesToRead);
+		moveCurrentCharForward(bytesToRead);
+
+		if (m_parsedRequest.body.length() == contentLength)
 		{
-			m_parsedRequest.body += *m_currentChar;
-			moveCurrentCharForward();
+			throw Interrupt::finishedParsingFullRequest;
+		}
 
-			if (m_parsedRequest.body.length() == contentLength)
-			{
-				throw Interrupt::finishedParsingFullRequest;
-			}
-
-			if (m_currentChar == m_bufferEnd)
-			{
-				throw Interrupt::reachedBufferEnd;
-			}
+		if (m_currentChar == m_bufferEnd)
+		{
+			throw Interrupt::reachedBufferEnd;
 		}
 	}
 	else
@@ -523,6 +514,12 @@ void HttpRequestParser::checkIfRequestTooBig()
 {
 	if (m_bytesParsed > maxRequestLength)
 		throw Interrupt::requestTooBig;
+}
+
+void HttpRequestParser::checkIfReachBufferEnd()
+{
+	if (m_currentChar == m_bufferEnd)
+		throw Interrupt::reachedBufferEnd;
 }
 
 int HttpRequestParser::hashChar(int lastHash, char chr)

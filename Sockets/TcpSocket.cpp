@@ -41,6 +41,7 @@ void TcpSocket::receive(char* buffer, int bufferSize, int* bytesReceived)
 
 void TcpSocket::close()
 {
+	std::cout << "closed " << m_socketDescriptor << '\n';
 	if (m_socketDescriptor != Socket::invalidSocketDescriptor)
 	{
 		try
@@ -103,4 +104,9 @@ void TcpSocket::setupServer(uint16_t port)
 
 TcpSocket::TcpSocket(int socketDescriptor)
 	: m_socketDescriptor(socketDescriptor)
-{}
+{
+	if (m_socketDescriptor != -1)
+	{
+		std::cout << "created " << m_socketDescriptor << '\n';
+	}
+}
