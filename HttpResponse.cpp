@@ -1,13 +1,34 @@
 #include "HttpResponse.h"
 
+HttpResponse::HttpResponse()
+	: m_statusCode(HttpStatus::Ok)
+	, m_statusText("OK")
+{}
+
 std::string HttpResponse::toString()
 {
-	std::string response;
-	response.reserve(100);
-	response = "HTTP/1.1 " + std::to_string(m_statusCode) + ' ' + m_statusText + "\r\n";
-	for (const auto& [key, value] : m_headers) {
-		response += key + ": " + value + "\r\n";
-	}
-	response += "\r\n";
-	return response;
+	std::stringstream output;
+
+	output << "HTTP/1.1 " << static_cast<int>(m_statusCode) << " " << statusCodeToString(m_statusCode) << "\r\n";
+	for (auto& [name, value] : headers)
+		output << name << ": " << value << "\r\n";
+	output << "\r\n";
+			
+	return output.str();
+}
+
+void HttpResponse::setStatus(HttpStatus statusCode)
+{
+	m_statusCode = statusCode;
+	m_statusText = statusCodeToString(statusCode);
+}
+
+HttpStatus HttpResponse::statusCode() const
+{
+	return m_statusCode;
+}
+
+const std::string& HttpResponse::statusText() const
+{
+	return m_statusText;
 }

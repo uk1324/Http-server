@@ -76,7 +76,7 @@ void HttpServer::handleClient(TcpSocket& client)
 void HttpServer::handleRequest(TcpSocket& client, const HttpRequest& request)
 {
 	std::cout << static_cast<int>(request.method) << '\n';
-	std::cout << request.requestTarget << '\n';
+	std::cout << request.requestTarget.path() << '\n';
 	std::cout << static_cast<int>(request.version) << '\n';
 
 	for (auto& [name, value] : request.headers)

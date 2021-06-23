@@ -4,6 +4,7 @@
 #include <array>
 
 #include "../HttpRequest.h"
+#include "../HttpParsingUtils.h"
 
 // Up to date HTTP specifications: https://www.w3.org/Protocols/
 // HTTP/1.1 Implementor's Forum:   https://www.w3.org/Protocols/HTTP/Forum/
@@ -11,6 +12,14 @@
 class HttpRequestParser
 {
 public:
+	HttpRequestParser() = delete;
+	HttpRequestParser(const char* buffer);
+
+	void parse(int messageSize);
+
+	inline HttpRequest result() const;
+	inline HttpRequest& result();
+
 	enum class Interrupt
 	{
 		reachedBufferEnd,
@@ -20,15 +29,8 @@ public:
 		unsupportedMethod,
 		unsupportedVersion,
 		requestTooBig,
+		uriTooLong
 	};
-
-	HttpRequestParser() = delete;
-	HttpRequestParser(const char* buffer);
-
-	void parse(int messageSize);
-
-	inline HttpRequest result() const;
-	inline HttpRequest& result();
 
 private:
 	void parseRequestLine();
@@ -37,35 +39,23 @@ private:
 	void parseVersion();
 
 	void parseHeaderName();
-	void parseHeaderValue();
-	void parseCrlf();
 	CaseInsensitiveString headerNameState;
+	void parseHeaderValue();
 	std::string headerValueState;
+	void parseCrlf();
 	std::string parsedCrlfState;
 
 	void parseBody();
 
-	void skipChars(char charToMatch);
 	void skipWhitespaces();
-	void skipUntil(char charToMatch);
 	bool matchString(std::string match);
 
-	bool isValidPathChar(char chr);
-	bool isValidHeaderChar(char chr);
-	bool isValidSeparatorChar(char chr);
-	int isWhitespace(char chr);
-	int hexDigitToInt(char digit);
-
-	inline void moveCurrentCharForward();
-	inline void moveCurrentCharForward(int count);
+	inline void moveCurrentCharForward(int count = 1);
 
 	void resetState();
 
 	void checkIfRequestTooBig();
-	void checkIfReachBufferEnd();
-
-	static int hashChar(int lastHash, char chr);
-	static int hashString(const char* string);
+	void checkIfReachedBufferEnd();
 
 private:
 	enum class State
@@ -80,16 +70,17 @@ private:
 
 	static constexpr int maxRequestLength = 8192;
 	static constexpr int maxRequestBodyLength = 8192;
+	static constexpr int maxUriLength = 1024;
 
 	HttpRequest m_parsedRequest;
 
-	State m_currentState = State::parsingRequestLine;
+	State m_currentState;
 
 	const char* m_bufferStart;
 	const char* m_bufferEnd;
 	const char* m_currentChar;
 
-	int m_bytesParsed = 0;
+	int m_bytesParsed;
 };
 
 inline HttpRequest HttpRequestParser::result() const
@@ -100,12 +91,6 @@ inline HttpRequest HttpRequestParser::result() const
 inline HttpRequest& HttpRequestParser::result()
 {
 	return m_parsedRequest;
-}
-
-inline void HttpRequestParser::moveCurrentCharForward()
-{
-	m_currentChar++;
-	m_bytesParsed++;
 }
 
 inline void HttpRequestParser::moveCurrentCharForward(int count)

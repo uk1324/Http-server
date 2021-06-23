@@ -1,18 +1,9 @@
 #pragma once
 
-// remove socketIncluded.h later
-
 #include <stdexcept>
 #include <string>
 
-#ifdef _WIN32
-	#include <winsock2.h>
-	#include <ws2tcpip.h>
-	#pragma comment(lib, "Ws2_32.lib")
-#else
-	#include <unistd.h>
-	#include <sys/socket.h>
-#endif
+#include "SocketInitializer.h"
 
 namespace Socket
 {

@@ -4,6 +4,8 @@ HttpRequestParser::HttpRequestParser(const char* buffer)
 	: m_bufferStart(buffer)
 	, m_currentChar(buffer)
 	, m_bufferEnd(nullptr)
+	, m_currentState(State::parsingRequestLine)
+	, m_bytesParsed(0)
 {}
 
 void HttpRequestParser::parse(int messageSize)
@@ -129,65 +131,59 @@ void HttpRequestParser::parseRequestLine()
 
 void HttpRequestParser::parseMethod()
 {
-	static const std::unordered_map<int, HttpMethod> hashes
+	static const std::unordered_map<std::string, HttpMethod> methods
 	{
-		{ hashString("GET"),    HttpMethod::Get },
-		{ hashString("POST"),   HttpMethod::Post },
-		{ hashString("PUT"),    HttpMethod::Put },
-		{ hashString("DELETE"), HttpMethod::Delete },
-		{ hashString("PATCH"),  HttpMethod::Patch }
+		{ "GET",    HttpMethod::Get },
+		{ "POST",   HttpMethod::Post },
+		{ "PUT",    HttpMethod::Put },
+		{ "DELETE", HttpMethod::Delete },
+		{ "PATCH",  HttpMethod::Patch }
 	};
 
-	static constexpr int longestMethodName = 7;
-
-	int hash = 0;
-	int hashedCharsCount = 0;
-
+	int parsedStringLength = 0;
 	while (true)
 	{
-		if (*m_currentChar == ' ')
-		{
-			// Skip space
-			moveCurrentCharForward();
-
+		if (m_currentChar[parsedStringLength] == ' ')
 			break;
-		}
 
 		// Buffer ended but haven't finished parsing
-		if (m_currentChar == m_bufferEnd)
-		{
+		if (m_currentChar + parsedStringLength == m_bufferEnd)
 			throw Interrupt::invalidChar;
-		}
 
-		hash = hashChar(hash, *m_currentChar);
-		hashedCharsCount++;
-		moveCurrentCharForward();
-
-		if (hashedCharsCount > longestMethodName)
-			throw Interrupt::unsupportedMethod;
+		parsedStringLength++;
 	}
 
-	if (hashes.count(hash) > 0)
-		m_parsedRequest.method = hashes.at(hash);
+	std::string parsedString(m_currentChar, parsedStringLength);
+
+	if (methods.count(parsedString) > 0)
+	{
+		m_parsedRequest.method = methods.at(parsedString);
+		// + 1 to skip space
+		moveCurrentCharForward(parsedString.length() + 1);
+	}
 	else
+	{
 		throw Interrupt::unsupportedMethod;
+	}
 }
 
 void HttpRequestParser::parseRequestTarget()
 {
-	// Only allow relative URLs
-	if (*m_currentChar != '/')
-		throw Interrupt::invalidChar;
+	std::string requestTarget;
 
 	while (true)
 	{
 		if (*m_currentChar == ' ')
 		{
-			if (m_parsedRequest.requestTarget.length() > 0)
+			if (requestTarget.length() > 0)
 			{
 				// Skip space
 				moveCurrentCharForward();
 
+				if (requestTarget.length() > maxUriLength)
+					throw Interrupt::uriTooLong;
+
+				m_parsedRequest.requestTarget = HttpRequestTarget(requestTarget);
 				return;
 			}
 			else
@@ -196,25 +192,21 @@ void HttpRequestParser::parseRequestTarget()
 			}
 		}
 
-		// Buffer ended but haven't finished parsing or invalid char
-		if ((isValidPathChar(*m_currentChar) == false) || (m_currentChar == m_bufferEnd))
-		{
+		// Buffer ended but haven't finished parsing
+		if (m_currentChar == m_bufferEnd)
 			throw Interrupt::invalidChar;
-		}
 
-		m_parsedRequest.requestTarget += *m_currentChar;
+		requestTarget += *m_currentChar;
 		moveCurrentCharForward();
 	}
 }
 
 void HttpRequestParser::parseVersion()
 {
-	static const std::unordered_map<int, HttpVersion> hashes = {
-		{ hashString("1.0"), HttpVersion::Http10 },
-		{ hashString("1.1"), HttpVersion::Http11 }
+	static const std::unordered_map<std::string, HttpVersion> versions = {
+		{ "1.0", HttpVersion::Http10 },
+		{ "1.1", HttpVersion::Http11 }
 	};
-
-	static constexpr int maxVersionStringLength = 3;
 
 	try
 	{
@@ -226,38 +218,35 @@ void HttpRequestParser::parseVersion()
 		throw interrupt;
 	}
 
-	if (m_currentChar + maxVersionStringLength > m_bufferEnd)
-	{
-		throw Interrupt::invalidChar;
-	}
 
-	int hash = 0;
-	int hashedCharsCount = 0;
-
+	int parsedStringLength = 0;
 	while (true)
 	{
-		if (*m_currentChar == '\r')
+		if (m_currentChar[parsedStringLength] == '\r')
 			break;
-		else if (m_currentChar == m_bufferEnd)
-			throw Interrupt::unsupportedVersion;
 
-		hash = hashChar(hash, *m_currentChar);
-		hashedCharsCount++;
+		// Buffer ended but haven't finished parsing
+		if (m_currentChar + parsedStringLength == m_bufferEnd)
+			throw Interrupt::invalidChar;
 
-		moveCurrentCharForward();
-
-		if (hashedCharsCount > maxVersionStringLength)
-			throw Interrupt::unsupportedVersion;
+		parsedStringLength++;
 	}
 
-	if (hashes.count(hash) > 0)
-		m_parsedRequest.version = hashes.at(hash);
+	std::string parsedString(m_currentChar, parsedStringLength);
+
+	if (versions.count(parsedString) > 0)
+	{
+		m_parsedRequest.version = versions.at(parsedString);
+		moveCurrentCharForward(parsedString.length());
+	}
 	else
+	{
 		throw Interrupt::unsupportedVersion;
+	}
 }
 void HttpRequestParser::parseHeaderName()
 {
-	checkIfReachBufferEnd();
+	checkIfReachedBufferEnd();
 
 	while (true)
 	{
@@ -268,7 +257,7 @@ void HttpRequestParser::parseHeaderName()
 
 			break;
 		}
-		else if (isValidHeaderChar(*m_currentChar) == false)
+		else if (HttpParsingUtils::isValidHeaderNameChar(*m_currentChar) == false)
 		{
 			throw Interrupt::invalidChar;
 		}
@@ -285,7 +274,7 @@ void HttpRequestParser::parseHeaderName()
 
 void HttpRequestParser::parseHeaderValue()
 {
-	checkIfReachBufferEnd();
+	checkIfReachedBufferEnd();
 
 	while (true)
 	{
@@ -293,9 +282,7 @@ void HttpRequestParser::parseHeaderValue()
 		{
 			break;
 		}
-		else if (((isValidHeaderChar(*m_currentChar) == false)
-			&& (isWhitespace(*m_currentChar) == false)
-			&& (isValidSeparatorChar(*m_currentChar) == false)))
+		else if (HttpParsingUtils::isValidHeaderValueChar(*m_currentChar) == false)
 		{
 			throw Interrupt::invalidChar;
 		}
@@ -314,7 +301,7 @@ void HttpRequestParser::parseCrlf()
 {
 	static const std::string crlf = "\r\n";
 
-	checkIfReachBufferEnd();
+	checkIfReachedBufferEnd();
 
 	while (true)
 	{
@@ -341,12 +328,13 @@ void HttpRequestParser::parseCrlf()
 
 void HttpRequestParser::parseBody()
 {
-	if (m_parsedRequest.headers.count("Content-Length") > 0)
+	if (m_parsedRequest.headers.containsHeader("Content-Length"))
 	{
 		int contentLength;
 		try
 		{
-			contentLength = std::stoi(m_parsedRequest.headers["Content-Length"]);
+			contentLength = m_parsedRequest.headers.tryGetHeaderInt("Content-Length");
+			//contentLength = std::stoi(m_parsedRequest.headers["Content-Length"]);
 
 			// Don't know if this is safe
 			if (contentLength <= maxRequestBodyLength)
@@ -359,8 +347,7 @@ void HttpRequestParser::parseBody()
 
 		int unreadBytesInBuffer = m_bufferEnd - m_currentChar;
 		int bodyBytesRemeaining = contentLength - m_parsedRequest.body.length();
-
-		// This is unlikely to happen but the client might send more bytes than Content-length specifies
+		// The first option is unlikely to happen but the client might send more bytes than Content-length specifies
 		int bytesToRead = unreadBytesInBuffer > bodyBytesRemeaining
 			? bodyBytesRemeaining
 			: unreadBytesInBuffer;
@@ -369,14 +356,10 @@ void HttpRequestParser::parseBody()
 		moveCurrentCharForward(bytesToRead);
 
 		if (m_parsedRequest.body.length() == contentLength)
-		{
 			throw Interrupt::finishedParsingFullRequest;
-		}
 
 		if (m_currentChar == m_bufferEnd)
-		{
 			throw Interrupt::reachedBufferEnd;
-		}
 	}
 	else
 	{
@@ -384,21 +367,9 @@ void HttpRequestParser::parseBody()
 	}
 }
 
-void HttpRequestParser::skipChars(char charToMatch)
-{
-	while ((*m_currentChar == charToMatch) && (m_currentChar < m_bufferEnd))
-		moveCurrentCharForward();
-}
-
 void HttpRequestParser::skipWhitespaces()
 {
-	while ((isWhitespace(*m_currentChar)) && (m_currentChar < m_bufferEnd))
-		moveCurrentCharForward();
-}
-
-void HttpRequestParser::skipUntil(char charToMatch)
-{
-	while ((*m_currentChar != charToMatch) && (m_currentChar < m_bufferEnd))
+	while ((HttpParsingUtils::isWhitespcae(*m_currentChar)) && (m_currentChar < m_bufferEnd))
 		moveCurrentCharForward();
 }
 
@@ -422,119 +393,14 @@ bool HttpRequestParser::matchString(std::string target)
 	return true;
 }
 
-bool HttpRequestParser::isValidPathChar(char chr)
-{
-	// https://datatracker.ietf.org/doc/html/rfc3986#section-2
-	return isalnum(chr)
-		|| chr == '-'
-		|| chr == '.'
-		|| chr == '_'
-		|| chr == '~'
-		|| chr == ':'
-		|| chr == '/'
-		|| chr == '?'
-		|| chr == '#'
-		|| chr == '['
-		|| chr == ']'
-		|| chr == '@'
-		|| chr == '!'
-		|| chr == '$'
-		|| chr == '&'
-		|| chr == '\''
-		|| chr == '('
-		|| chr == ')'
-		|| chr == '*'
-		|| chr == '+'
-		|| chr == ','
-		|| chr == ';'
-		|| chr == '=';
-}
-
-bool HttpRequestParser::isValidHeaderChar(char chr)
-{
-	// Specification: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2.6
-	return isalnum(chr)
-		|| chr == '!'
-		|| chr == '#'
-		|| chr == '$'
-		|| chr == '%'
-		|| chr == '&'
-		|| chr == '\''
-		|| chr == '*'
-		|| chr == '+'
-		|| chr == '-'
-		|| chr == '.'
-		|| chr == '^'
-		|| chr == '_'
-		|| chr == '`'
-		|| chr == '|'
-		|| chr == '~';
-}
-
-bool HttpRequestParser::isValidSeparatorChar(char chr)
-{
-	return chr == '('
-		|| chr == ')'
-		|| chr == '/'
-		|| chr == ','
-		|| chr == ':'
-		|| chr == '<'
-		|| chr == '='
-		|| chr == '>'
-		|| chr == '?'
-		|| chr == '@'
-		|| chr == '['
-		|| chr == ']'
-		|| chr == '\\'
-		|| chr == '{'
-		|| chr == '}'
-		|| chr == ';'
-		|| chr == '"';
-
-}
-
-int HttpRequestParser::isWhitespace(char chr)
-{
-	return chr == ' ' || chr == '\t';
-}
-
-int HttpRequestParser::hexDigitToInt(char digit)
-{
-	int num = -1;
-	if ((digit >= '0') && (digit <= '9'))
-		num = (digit - '0');
-	else if ((digit >= 'A') && (digit <= 'F'))
-		num = (digit - 'A' + 10);
-	else if ((digit >= 'a') && (digit <= 'f'))
-		num = (digit - 'a' + 10);
-	return num;
-}
-
 void HttpRequestParser::checkIfRequestTooBig()
 {
 	if (m_bytesParsed > maxRequestLength)
 		throw Interrupt::requestTooBig;
 }
 
-void HttpRequestParser::checkIfReachBufferEnd()
+void HttpRequestParser::checkIfReachedBufferEnd()
 {
 	if (m_currentChar == m_bufferEnd)
 		throw Interrupt::reachedBufferEnd;
-}
-
-int HttpRequestParser::hashChar(int lastHash, char chr)
-{
-	static constexpr int hashMultiplier = 37;
-	return lastHash * hashMultiplier + chr;
-}
-
-int HttpRequestParser::hashString(const char* string)
-{
-	int hash = 0;
-	for (const char* chr = string; *chr != '\0'; chr++)
-	{
-		hash = hashChar(hash, *chr);
-	}
-
-	return hash;
 }

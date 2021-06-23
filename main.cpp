@@ -1,32 +1,13 @@
 #include "HttpServer.h"
 
-#include "CaseInsensitiveString.h"
+#include "tests/TestList.h"
 
-#include "Sockets/SocketInitializer.h"
-
-#include "tests/HttpRequestParserTests.h"
+#include "HttpHeaders.h"
 
 int main()
 {
-	//using namespace Tests;
-	//HttpRequestParserTests::runAllTests();
-
-
-	//std::string a;
-
-	//char b[] = { 'a', 'b', '\0', 'c', 'd' };
-
-	//for (auto c : b)
-	//{
-	//	a += c;
-	//	std::cout << a << " len: " << a.length() << '\n';
-	//}
-
-	//CaseInsensitiveString a = "abc";
-	//CaseInsensitiveString b = std::string("abcd");
-
-	// path could be percent encoded
-	// first parse percent encoding then parse the actual string skip nulls
+	//Tests::HttpParsingUtilsTests a;
+	//a.runAllTests();
 
 	HttpServer server;
 	try

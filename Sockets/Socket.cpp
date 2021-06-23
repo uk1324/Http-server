@@ -1,7 +1,5 @@
 #include "Socket.h"
 
-#include <iostream>
-
 int Socket::create(int protocolFamily, int type, int protocol)
 {
 	int socketDescriptor = socket(protocolFamily, type, protocol);

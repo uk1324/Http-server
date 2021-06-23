@@ -12,5 +12,4 @@ struct CaseInsensitiveCharTraits : public std::char_traits<char>
 
 using CaseInsensitiveString = std::basic_string<char, CaseInsensitiveCharTraits>;
 
-
 std::ostream& operator<< (std::ostream& os, const CaseInsensitiveString& str);
