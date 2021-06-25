@@ -64,6 +64,7 @@ void HttpRequestParser::parse(int messageSize)
 
 			case State::parsingHeaderValue:
 				m_currentState = State::parsingHeaderValue;
+
 				parseHeaderValue();
 
 				checkIfRequestTooBig();
@@ -274,6 +275,11 @@ void HttpRequestParser::parseHeaderName()
 
 void HttpRequestParser::parseHeaderValue()
 {
+	checkIfReachedBufferEnd();
+
+	if (headerValueState.length() == 0)
+		skipWhitespaces();
+
 	checkIfReachedBufferEnd();
 
 	while (true)

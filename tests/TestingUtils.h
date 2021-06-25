@@ -11,8 +11,8 @@ namespace Tests
 
 		template <typename T>
 		void assertEquals(T result, T wantedResult);
-		void assertTrue(bool test, const char* message);
-		void assertFalse(bool test, const char* message);
+		void assertTrue(bool test, std::string message);
+		void assertFalse(bool test, std::string message);
 
 		virtual void runAllTests() = 0;
 

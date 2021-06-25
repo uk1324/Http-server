@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
+#include <sstream>
 
 #include "CaseInsensitiveString.h"
 #include "HttpRequestTarget.h"
@@ -25,9 +25,13 @@ enum class HttpVersion
 
 class HttpRequest
 {
+
 public:
 	HttpRequest();
+	
+	std::string toString();
 
+public:
 	HttpMethod method;
 	HttpRequestTarget requestTarget;
 	HttpVersion version;

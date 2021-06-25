@@ -6,16 +6,16 @@
 
 int main()
 {
-	//Tests::HttpParsingUtilsTests a;
-	//a.runAllTests();
+	Tests::HttpRequestParserTests a("HttpParsingUtilsTests");
+	a.runAllTests();
 
-	HttpServer server;
-	try
-	{
-		server.listen(8080);
-	}
-	catch (std::exception& err)
-	{
-		std::cout << err.what() << '\n';
-	}
+	//HttpServer server;
+	//try
+	//{
+	//	server.listen(8080);
+	//}
+	//catch (std::exception& err)
+	//{
+	//	std::cout << err.what() << '\n';
+	//}
 }

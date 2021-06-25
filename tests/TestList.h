@@ -16,6 +16,7 @@ namespace Tests
 	{
 		std::vector<std::shared_ptr<TestCase>> tests = {
 			std::make_shared<HttpParsingUtilsTests>("HttpParsingUtilsTests")
+			std::make_shared<HttpParsingUtilsTests>("HttpRequestParserTests")
 		};
 
 		for (auto& test : tests)

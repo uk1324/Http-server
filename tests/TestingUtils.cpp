@@ -4,7 +4,7 @@ Tests::TestCase::TestCase(const std::string& name)
 	: name(name)
 {}
 
-void Tests::TestCase::assertTrue(bool test, const char* message)
+void Tests::TestCase::assertTrue(bool test, std::string message)
 {
 	testCount++;
 
@@ -18,7 +18,7 @@ void Tests::TestCase::assertTrue(bool test, const char* message)
 	}
 }
 
-void Tests::TestCase::assertFalse(bool test, const char* message)
+void Tests::TestCase::assertFalse(bool test, std::string message)
 {
 	testCount++;
 
