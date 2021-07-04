@@ -8,12 +8,18 @@
 namespace Socket
 {
 	int create(int protocolFamily, int type, int protocol);
-	void close(int socketDescriptor);
-	void bind(int socketDescriptor, const sockaddr* address, int addressLength);
-	void listen(int socketDescriptor, int maxPendingConnections);
+	int close(int socketDescriptor);
+	int bind(int socketDescriptor, const sockaddr* address, int addressLength);
+	int listen(int socketDescriptor, int maxPendingConnections);
+	int accept(int socketDescriptor, sockaddr* address, int* addressLength);
+	int send(int socketDescriptor, char* buffer, int messageLength, int flags);
+	int recieve(int socketDescriptor, char* buffer, int bufferSize, int flags);
+
+	const char* getAddressInfoErrorToString(int errorCode);
 
 	int getErrorCode();
 
-	static constexpr int invalidSocketDescriptor = INVALID_SOCKET;
+	static constexpr int INVALID_DESCRIPTOR = INVALID_SOCKET;
+	static constexpr int SOCKET_ERR = SOCKET_ERROR;
 }
 

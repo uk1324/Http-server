@@ -4,33 +4,20 @@
 #include <stdexcept>
 #include <string>
 
-#include "Socket.h"
+#include "SocketBase.h"
 
-class TcpSocket
+class TcpListener;
+
+class TcpSocket : public SocketBase
 {
+	friend TcpListener;
+
 public:
-	TcpSocket() = default;
-	~TcpSocket();
-
-	TcpSocket(const TcpSocket&) = delete;
-	TcpSocket& operator=(TcpSocket const&) = delete;
-
-	void listen(uint16_t port);
-	TcpSocket accept();
-
+	static TcpSocket fromDescriptor(int socketDescriptor);
 	void send(char* buffer, int messageLength);
 	void receive(char* buffer, int bufferSize, int* bytesReceived);
 
-	void close();
-
-	bool isValid();
-
 private:
-	void setupServer(uint16_t port);
-
-	TcpSocket(int socketDescriptor);
-
-private:
-	int m_socketDescriptor = Socket::invalidSocketDescriptor;
+	explicit TcpSocket(int socketDescriptor);
 };
 

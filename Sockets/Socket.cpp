@@ -2,34 +2,51 @@
 
 int Socket::create(int protocolFamily, int type, int protocol)
 {
-	int socketDescriptor = socket(protocolFamily, type, protocol);
-	if (socketDescriptor == invalidSocketDescriptor)
-		throw std::runtime_error("Socket::create() error " + std::to_string(getErrorCode()) + '\n');
-	return socketDescriptor;
+	return socket(protocolFamily, type, protocol);
 }
 
-void Socket::close(int socketDescriptor)
+int Socket::close(int socketDescriptor)
 {
 #ifdef _WIN32
-	int status = closesocket(socketDescriptor);
+	return closesocket(socketDescriptor);
 #else
-	int status = ::close(m_handle);
+	return ::close(m_handle);
+#endif
+}
+
+int Socket::bind(int socketDescriptor, const sockaddr* address, int addressLength)
+{
+	return ::bind(socketDescriptor, address, addressLength);
+}
+
+int Socket::listen(int socketDescriptor, int maxPendingConnections)
+{
+	return ::listen(socketDescriptor, maxPendingConnections);
+}
+
+int Socket::accept(int socketDescriptor, sockaddr* address, int* addressLength)
+{
+	return ::accept(socketDescriptor, address, addressLength);
+}
+
+int Socket::send(int socketDescriptor, char* buffer, int messageLength, int flags)
+{
+	return ::send(socketDescriptor, buffer, messageLength, flags);
+}
+
+int Socket::recieve(int socketDescriptor, char* buffer, int bufferSize, int flags)
+{
+	return ::recv(socketDescriptor, buffer, bufferSize, flags);
+}
+
+const char* Socket::getAddressInfoErrorToString(int errorCode)
+{
+#ifdef _WIN32
+	return gai_strerrorA(errorCode);
+#else
+	return gai_strerror(errorCode);
 #endif
 
-	if (status == SOCKET_ERROR)
-		throw std::runtime_error("Socket::close() error " + std::to_string(getErrorCode()) + '\n');
-}
-
-void Socket::bind(int socketDescriptor, const sockaddr* address, int addressLength)
-{
-	if (::bind(socketDescriptor, address, addressLength) == SOCKET_ERROR)
-		throw std::runtime_error("Socket::bind() error " + std::to_string(getErrorCode()) + '\n');
-}
-
-void Socket::listen(int socketDescriptor, int maxPendingConnections)
-{
-	if (::listen(socketDescriptor, maxPendingConnections) == SOCKET_ERROR)
-		throw std::runtime_error("Socket::listen error" + std::to_string(getErrorCode()) + '\n');
 }
 
 int Socket::getErrorCode()

@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "HttpStatus.h"
+#include "HttpHeaders.h"
 #include "CaseInsensitiveString.h"
 
 class HttpResponse
@@ -20,7 +21,7 @@ public:
 	std::string toString();
 
 public:
-	std::unordered_map<CaseInsensitiveString, std::string> headers;
+	HttpHeaders headers;
 
 private:
 	HttpStatus m_statusCode = HttpStatus::Ok;
