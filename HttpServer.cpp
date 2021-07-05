@@ -1,5 +1,7 @@
 #include "HttpServer.h"
 
+#include <type_traits>
+
 void HttpServer::listen(uint16_t port)
 {
 	m_socket.listen(port);
@@ -9,25 +11,42 @@ void HttpServer::listen(uint16_t port)
 		try
 		{
 			// I have to pass the descriptor to thread because when code executes out of the try block the socket would be destructed and closed.
-			int clientDescriptor = m_socket.acceptDescriptor();
+			//int clientDescriptor = m_socket.acceptDescriptor();
 
-			std::thread clientThread([this, clientDescriptor] {
-				TcpSocket client = TcpSocket::fromDescriptor(clientDescriptor);
-				this->handleClient(client);
+			//std::thread clientThread([this, clientDescriptor] {
+			//	TcpSocket client = TcpSocket::fromDescriptor(clientDescriptor);
+			//	this->handleClient(client);
+			//});
+
+			//std::shared_ptr<TcpSocket> client = m_socket.acceptPtr();
+			//TcpSocket client = m_socket.accept();
+			//std::thread clientThread([this, client = std::move(client)] mutable {
+			//	this->handleClient(std::move(client));
+			//});
+
+			TcpSocket client = m_socket.accept();
+			std::thread clientThread([this, client = std::move(client)]() mutable {
+				this->handleClient(std::move(client));
 			});
 
+			//std::thread clientThread([this, client] { this->handleClient(client); });
 			clientThread.detach();
+
+			//std::thread clientThread = m_socket.acceptAndPassToThread(&HttpServer::handleClient);
+
+			//clientThread.detach();
 		}
-		catch (SocketError& error)
+		catch (const SocketError& error)
 		{
-			std::cout << error.what();
+			throw;
+			//std::cout << error.what();
 		}
 	}
 
 	//m_socket.close();
 }
 
-void HttpServer::handleClient(TcpSocket& socket)
+void HttpServer::handleClient(TcpSocket&& socket)
 {
 	static constexpr int messageBufferSize = 4096;
 	char messageBuffer[messageBufferSize];

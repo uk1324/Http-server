@@ -16,6 +16,7 @@ int main()
 	}
 	catch (std::exception& err)
 	{
+		throw;
 		std::cout << err.what() << '\n';
 	}
 }

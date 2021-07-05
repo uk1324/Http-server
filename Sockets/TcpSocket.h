@@ -17,7 +17,8 @@ public:
 	void send(char* buffer, int messageLength);
 	void receive(char* buffer, int bufferSize, int* bytesReceived);
 
-private:
+//private:
+public:
 	explicit TcpSocket(int socketDescriptor);
 };
 
