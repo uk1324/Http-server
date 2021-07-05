@@ -21,7 +21,7 @@ SocketBase::SocketBase(SocketBase&& other) noexcept
 
 void SocketBase::close()
 {
-	// shouldn't throw in descriptor
+	// Shouldn't throw in descriptor
 	if (m_socketDescriptor != Socket::INVALID_DESCRIPTOR)
 	{
 		if (Socket::close(m_socketDescriptor) == Socket::SOCKET_ERR)

@@ -21,27 +21,6 @@ TcpSocket TcpListener::accept()
 	return TcpSocket(socketDescriptor);
 }
 
-std::shared_ptr<TcpSocket> TcpListener::acceptPtr()
-{
-	int socketDescriptor = Socket::accept(m_socketDescriptor, nullptr, nullptr);
-	if (socketDescriptor == Socket::INVALID_DESCRIPTOR)
-	{
-		throw SocketError("Socket::accept() error " + std::to_string(Socket::getErrorCode()));
-	}
-	return std::shared_ptr<TcpSocket>(new TcpSocket(socketDescriptor));
-	//return /*std::make_shared<TcpSocket>(TcpSocket(socketDescriptor));*/
-}
-
-int TcpListener::acceptDescriptor()
-{
-	int socketDescriptor = Socket::accept(m_socketDescriptor, nullptr, nullptr);
-	if (socketDescriptor == Socket::INVALID_DESCRIPTOR)
-	{
-		throw SocketError("Socket::accept() error " + std::to_string(Socket::getErrorCode()));
-	}
-	return socketDescriptor;
-}
-
 void TcpListener::setupServer(uint16_t port)
 {
 	struct addrinfo hints { 0 };
