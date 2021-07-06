@@ -7,16 +7,27 @@ SocketBase::~SocketBase()
 
 SocketBase& SocketBase::operator=(SocketBase&& other) noexcept
 {
-	close();
-	m_socketDescriptor = other.m_socketDescriptor;
-	other.m_socketDescriptor = Socket::INVALID_DESCRIPTOR;
+	if (&other != this)
+		this->close();
+
+	std::swap(m_socketDescriptor, other.m_socketDescriptor);
+
 	return *this;
+
+	//close();
+	//m_socketDescriptor = other.m_socketDescriptor;
+	//other.m_socketDescriptor = Socket::INVALID_DESCRIPTOR;
+	//return *this;
 }
+
+SocketBase::SocketBase()
+	: m_socketDescriptor(Socket::INVALID_DESCRIPTOR)
+{}
 
 SocketBase::SocketBase(SocketBase&& other) noexcept
 	:m_socketDescriptor(other.m_socketDescriptor)
 {
-	other.m_socketDescriptor = -1;
+	other.m_socketDescriptor = Socket::INVALID_DESCRIPTOR;
 }
 
 void SocketBase::close()

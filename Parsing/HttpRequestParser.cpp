@@ -375,7 +375,7 @@ void HttpRequestParser::parseBody()
 
 void HttpRequestParser::skipWhitespaces()
 {
-	while ((HttpParsingUtils::isWhitespcae(*m_currentChar)) && (m_currentChar < m_bufferEnd))
+	while ((HttpParsingUtils::isWhitespace(*m_currentChar)) && (m_currentChar < m_bufferEnd))
 		moveCurrentCharForward();
 }
 

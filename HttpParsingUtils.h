@@ -14,7 +14,7 @@ namespace HttpParsingUtils
 	bool isTokenChar(char chr);
 	bool isVisiblechar(char chr);
 	bool isObsChar(char chr);
-	bool isWhitespcae(char chr);
+	bool isWhitespace(char chr);
 	bool isValidHeaderNameChar(char chr);
 	bool isValidHeaderValueChar(char chr);
 };

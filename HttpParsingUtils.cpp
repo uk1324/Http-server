@@ -126,7 +126,7 @@ bool HttpParsingUtils::isObsChar(char chr)
 	return chr >= 0x80 && chr <= 0xFF;
 }
 
-bool HttpParsingUtils::isWhitespcae(char chr)
+bool HttpParsingUtils::isWhitespace(char chr)
 {
 	return chr == ' ' || chr == '\t';
 }

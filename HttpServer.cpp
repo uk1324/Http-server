@@ -1,6 +1,7 @@
 #include "HttpServer.h"
 
 #include <type_traits>
+#include <chrono>
 
 void HttpServer::listen(uint16_t port)
 {
@@ -45,18 +46,30 @@ void HttpServer::handleClient(TcpSocket&& socket)
 
 		if (messageSize > 0)
 		{
+			auto start = std::chrono::system_clock::now();
+			auto end = std::chrono::system_clock::now();
+
+			/* do some work */
+
 			try
 			{
+				start = std::chrono::system_clock::now();
 				// Parsing can be split between multiple receive calls
 				parser.parse(messageSize);
 			}
 			catch (HttpRequestParser::Interrupt interrupt)
 			{
 				if (interrupt == HttpRequestParser::Interrupt::finishedParsingFullRequest)
+				{
+					end = std::chrono::system_clock::now();
+					std::cout << "elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << '\n';;
 					handleRequest(socket, parser.result());
+				}
 				// Continute parsing on reachedBufferEnd
 				else if (interrupt != HttpRequestParser::Interrupt::reachedBufferEnd)
+				{
 					handleInvalidRequest(socket, parser.result(), interrupt);
+				}
 			}
 		}
 		else

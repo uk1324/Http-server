@@ -6,11 +6,11 @@
 class SocketBase
 {
 public:
-	SocketBase() = default;
+	SocketBase();
 	SocketBase(const SocketBase&) = delete;
-	SocketBase operator= (const SocketBase&) = delete;
+	SocketBase& operator= (const SocketBase&) = delete;
 	SocketBase(SocketBase&& other) noexcept;
-	SocketBase& operator=(SocketBase&& othexr) noexcept;
+	SocketBase& operator= (SocketBase&& othexr) noexcept;
 	~SocketBase();
 
 public:
