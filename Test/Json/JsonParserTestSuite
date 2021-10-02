@@ -1,0 +1,35 @@
+Passes all JSON Parsing Test Suite tests - https://github.com/nst/JSONTestSuite
+
+Errors on first test attempt:
+- Wrote 7E instead of 7F.
+- Didn't check if all tokens got consumed at end.
+- When scanning for keyword called peek() before isAtEnd() in an while loop causing it to throw EOF error when input was a single keyword.
+- Didn't use unsigned chars with ctype.h functions.
+
+Code:
+
+int main(int argc, char* argv[])
+{
+	try
+	{
+		if (argc == 2)
+		{
+			std::ifstream file(argv[1], std::ios::binary);
+			std::string buffer((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+			try
+			{
+				JsonParser::parse(buffer);
+				return 0;
+			}
+			catch (const JsonParser::ParsingError& e)
+			{
+				return 1;
+			}
+		}
+	}
+	catch (const std::exception&)
+	{
+		return 3;
+	}
+}

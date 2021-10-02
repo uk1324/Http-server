@@ -5,7 +5,7 @@ TcpSocket TcpSocket::fromDescriptor(int socketDescriptor)
 	return TcpSocket(socketDescriptor);
 }
 
-void TcpSocket::send(char* buffer, int messageLength)
+void TcpSocket::send(const char* buffer, int messageLength)
 {
 	::send(m_socketDescriptor, buffer, messageLength, 0);
 }

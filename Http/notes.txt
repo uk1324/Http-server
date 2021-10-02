@@ -1,0 +1,27 @@
+// send 400 - bad request
+// when an invalid method is sent should send 501 - not implemented
+// when request-target(path) is longer too should send 414 - uri too long
+// quote from ending of https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1 
+// ***
+// It is RECOMMENDED that all HTTP sendersand recipients
+// support, at a minimum, request - line lengths of 8000 octets
+// ***
+// quote from https://datatracker.ietf.org/doc/html/rfc7230#section-3.2.4
+// ***
+// No whitespace is allowed between the header field-name and colon.  In
+// the past, differences in the handling of such whitespace have led to
+// security vulnerabilities in request routingand response handling.A
+// server MUST reject any received request message that contains
+// whitespace between a header field - name and colon with a response code
+// of 400 (Bad Request).A proxy MUST remove any such whitespace from a
+// response message before forwarding the message downstream.
+// ***
+// quote https://datatracker.ietf.org/doc/html/rfc7230#section-3.2.5
+
+HTTP does not place a predefined limit on the length of a
+request-line, as described in Section 2.5.  A server that receives a
+method longer than any that it implements SHOULD respond with a 501
+(Not Implemented) status code.  A server that receives a
+
+It is RECOMMENDED that all HTTP senders and recipients
+support, at a minimum, request-line lengths of 8000 octets.

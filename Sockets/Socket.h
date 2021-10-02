@@ -5,6 +5,7 @@
 
 #include "SocketInitializer.h"
 
+// This namespace isn't pretty much useless
 namespace Socket
 {
 	int create(int protocolFamily, int type, int protocol);
@@ -15,7 +16,7 @@ namespace Socket
 	int send(int socketDescriptor, char* buffer, int messageLength, int flags);
 	int recieve(int socketDescriptor, char* buffer, int bufferSize, int flags);
 
-	const char* getAddressInfoErrorToString(int errorCode);
+	const char* addressInfoErrorToString(int errorCode);
 
 	int getErrorCode();
 

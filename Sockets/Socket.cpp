@@ -39,7 +39,7 @@ int Socket::recieve(int socketDescriptor, char* buffer, int bufferSize, int flag
 	return ::recv(socketDescriptor, buffer, bufferSize, flags);
 }
 
-const char* Socket::getAddressInfoErrorToString(int errorCode)
+const char* Socket::addressInfoErrorToString(int errorCode)
 {
 #ifdef _WIN32
 	return gai_strerrorA(errorCode);

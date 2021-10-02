@@ -14,7 +14,7 @@ class TcpSocket : public SocketBase
 
 public:
 	static TcpSocket fromDescriptor(int socketDescriptor);
-	void send(char* buffer, int messageLength);
+	void send(const char* buffer, int messageLength);
 	void receive(char* buffer, int bufferSize, int* bytesReceived);
 
 //private:

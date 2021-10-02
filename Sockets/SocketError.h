@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+// Could just put this in socket base
 class SocketError : public std::runtime_error
 {
 public:
